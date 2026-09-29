@@ -1,0 +1,10 @@
+{
+  "name": "LingoMentor AI - English Speaking Teacher",
+  "description": "Advanced AI English speaking tutor with real-time voice conversation, grammar & pronunciation correction, Uzbek explanations, structured lessons, and CEFR level tracking.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
