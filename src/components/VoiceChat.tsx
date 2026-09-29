@@ -14,6 +14,8 @@ import {
   User,
   Bot,
   Gauge,
+  History,
+  Trash2,
 } from 'lucide-react';
 import { ChatMessage, CEFRLevel, Language, SpeakingMode } from '../types';
 import { translations } from '../i18n/translations';
@@ -22,6 +24,7 @@ import { SpeechService } from '../services/speechService';
 import { dataStore } from '../services/storage';
 import { CorrectionCard } from './CorrectionCard';
 import { AudioWaveform } from './AudioWaveform';
+import { ConversationHistoryModal } from './ConversationHistoryModal';
 
 interface VoiceChatProps {
   mode: SpeakingMode;
@@ -31,6 +34,7 @@ interface VoiceChatProps {
   lessonContext?: string;
   initialPrompt?: string;
   onUpdateStats?: () => void;
+  onSelectSession?: (sessionId: string, mode: SpeakingMode, level: CEFRLevel) => void;
 }
 
 export const VoiceChat: React.FC<VoiceChatProps> = ({
@@ -41,6 +45,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
   lessonContext,
   initialPrompt,
   onUpdateStats,
+  onSelectSession,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatState, setChatState] = useState<'idle' | 'listening' | 'processing' | 'speaking' | 'paused'>('idle');
@@ -52,6 +57,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [speakingSeconds, setSpeakingSeconds] = useState<number>(0);
   const [activeAudioPlayingId, setActiveAudioPlayingId] = useState<string | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
   const [micLang, setMicLang] = useState<'en-US' | 'uz-UZ'>(
     explanationLanguage === 'uz' ? 'uz-UZ' : 'en-US'
   );
@@ -74,7 +80,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
         timestamp: Date.now(),
       };
       setMessages([welcomeMsg]);
-      dataStore.saveChatMessage(sessionId, welcomeMsg);
+      dataStore.saveChatMessage(sessionId, welcomeMsg, {
+        title: mode.replace(/_/g, ' '),
+        mode,
+        level: userLevel,
+      });
       // Speak welcome message
       SpeechService.speak(initialPrompt, { rate: speechSpeed, voicePreference: selectedVoice });
     }
@@ -183,7 +193,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
 
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
-    dataStore.saveChatMessage(sessionId, userMsg);
+    dataStore.saveChatMessage(sessionId, userMsg, {
+      title: mode.replace(/_/g, ' '),
+      mode,
+      level: userLevel,
+    });
 
     try {
       const response = await AIService.sendChatMessage({
@@ -198,7 +212,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
 
       // Attach correction to the user message
       userMsg.correction = response.correction;
-      dataStore.saveChatMessage(sessionId, userMsg);
+      dataStore.saveChatMessage(sessionId, userMsg, {
+        title: mode.replace(/_/g, ' '),
+        mode,
+        level: userLevel,
+      });
 
       const assistantMsg: ChatMessage = {
         id: `msg-${Date.now()}-ai`,
@@ -210,7 +228,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
 
       const updatedHistory = [...newMessages, assistantMsg];
       setMessages(updatedHistory);
-      dataStore.saveChatMessage(sessionId, assistantMsg);
+      dataStore.saveChatMessage(sessionId, assistantMsg, {
+        title: mode.replace(/_/g, ' '),
+        mode,
+        level: userLevel,
+      });
 
       // Record progress metrics in data store
       const minutes = Math.max(0.1, speakingSeconds / 60);
@@ -278,6 +300,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
     }
   };
 
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
+
+  const handleDeleteMessage = (messageId: string) => {
+    const updated = dataStore.deleteChatMessage(sessionId, messageId);
+    setMessages(updated);
+  };
+
   const handleReset = () => {
     SpeechService.stopListening();
     SpeechService.stopSpeaking();
@@ -286,6 +315,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
     setChatState('idle');
     setTranscript('');
     setInterimText('');
+    setShowClearConfirm(false);
   };
 
   return (
@@ -307,8 +337,18 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
           )}
         </div>
 
-        {/* Controls: Speed, Voice, Reset */}
+        {/* Controls: History, Speed, Voice, Reset */}
         <div className="flex items-center gap-2">
+          {/* History Button */}
+          <button
+            onClick={() => setIsHistoryModalOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[11px] font-semibold transition-colors border border-blue-200 dark:border-blue-800"
+            title={t.conversationHistory}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>{t.history}</span>
+          </button>
+
           {/* Speed Selector */}
           <div className="flex items-center gap-1 bg-slate-200/60 dark:bg-slate-800 px-2 py-1 rounded-md text-[11px]">
             <Gauge className="w-3 h-3 text-slate-500" />
@@ -339,14 +379,37 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
             </select>
           </div>
 
-          {/* Clear Session */}
-          <button
-            onClick={handleReset}
-            title={t.resetChat}
-            className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+          {/* Clear Session with In-UI Confirmation */}
+          {showClearConfirm ? (
+            <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/60 p-0.5 rounded-lg border border-red-200 dark:border-red-900 animate-fadeIn">
+              <button
+                onClick={handleReset}
+                className="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold hover:bg-red-700 transition-colors"
+                title="Tasdiqlash"
+              >
+                {explanationLanguage === 'uz' ? "Ha, tozalash" : "Yes, Clear"}
+              </button>
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="px-1.5 py-0.5 text-slate-600 dark:text-slate-300 text-[10px] hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-colors"
+              >
+                {explanationLanguage === 'uz' ? "Bekor" : "Cancel"}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (messages.length === 0) return;
+                setShowClearConfirm(true);
+              }}
+              disabled={messages.length === 0}
+              title={t.resetChat}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-slate-600 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 border border-slate-200 dark:border-slate-800 hover:border-red-200 dark:hover:border-red-900/40 disabled:opacity-40 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline font-medium">{explanationLanguage === 'uz' ? "Tozalash" : "Clear"}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -388,6 +451,14 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
                   <span>{isUser ? 'You' : 'AI Tutor'}</span>
                   <span>•</span>
                   <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <button
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 px-1.5 py-0.5 rounded transition-all ml-1.5"
+                    title={t.deleteMessage}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>{explanationLanguage === 'uz' ? "O'chirish" : "Delete"}</span>
+                  </button>
                 </div>
 
                 <div
@@ -595,6 +666,21 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
           </form>
         </div>
       </div>
+
+      {/* Conversation History Modal */}
+      <ConversationHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        lang={explanationLanguage}
+        onSelectSession={(selectedId, selectedMode, selectedLevel) => {
+          if (onSelectSession) {
+            onSelectSession(selectedId, selectedMode, selectedLevel);
+          } else {
+            const hist = dataStore.getChatHistory(selectedId);
+            setMessages(hist);
+          }
+        }}
+      />
     </div>
   );
 };

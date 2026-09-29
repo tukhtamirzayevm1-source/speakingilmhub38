@@ -11,6 +11,9 @@ import {
   RotateCcw,
   Check,
   ChevronRight,
+  Search,
+  X,
+  Trash2,
 } from 'lucide-react';
 import { CEFRLevel, Language, Lesson } from '../types';
 import { translations } from '../i18n/translations';
@@ -33,7 +36,43 @@ export const LessonsPage: React.FC<LessonsPageProps> = ({
   onUpdateStats,
 }) => {
   const [selectedLevelFilter, setSelectedLevelFilter] = useState<string>('All');
+  const [lessonSearch, setLessonSearch] = useState<string>('');
+  const [lessonSearchHistory, setLessonSearchHistory] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('lingo_mentor_lesson_search_history');
+      return stored ? JSON.parse(stored) : ['Greetings', 'Job Interview', 'Travel', 'Daily'];
+    } catch {
+      return ['Greetings', 'Travel'];
+    }
+  });
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+
+  const commitLessonSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setLessonSearch(trimmed);
+    try {
+      let updated = lessonSearchHistory.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
+      updated.unshift(trimmed);
+      if (updated.length > 15) updated = updated.slice(0, 15);
+      localStorage.setItem('lingo_mentor_lesson_search_history', JSON.stringify(updated));
+      setLessonSearchHistory(updated);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const removeLessonHistoryItem = (e: React.MouseEvent, item: string) => {
+    e.stopPropagation();
+    const updated = lessonSearchHistory.filter((i) => i.toLowerCase() !== item.toLowerCase().trim());
+    localStorage.setItem('lingo_mentor_lesson_search_history', JSON.stringify(updated));
+    setLessonSearchHistory(updated);
+  };
+
+  const clearAllLessonHistory = () => {
+    localStorage.removeItem('lingo_mentor_lesson_search_history');
+    setLessonSearchHistory([]);
+  };
   const [lessonStep, setLessonStep] = useState<'intro' | 'vocab' | 'warmup' | 'conversation' | 'summary'>('intro');
   const [completedLessons, setCompletedLessons] = useState<Record<string, any>>(dataStore.getAllLessonProgress());
 
@@ -42,8 +81,16 @@ export const LessonsPage: React.FC<LessonsPageProps> = ({
   const levels: (CEFRLevel | 'All')[] = ['All', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
   const filteredLessons = LESSONS_DATA.filter((l) => {
-    if (selectedLevelFilter === 'All') return true;
-    return l.level === selectedLevelFilter;
+    const matchesLevel = selectedLevelFilter === 'All' || l.level === selectedLevelFilter;
+    const q = lessonSearch.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      l.title.toLowerCase().includes(q) ||
+      l.uzbekTitle.toLowerCase().includes(q) ||
+      l.description.toLowerCase().includes(q) ||
+      l.uzbekDescription.toLowerCase().includes(q) ||
+      l.category.toLowerCase().includes(q);
+    return matchesLevel && matchesSearch;
   });
 
   const handleStartLesson = (lesson: Lesson) => {
@@ -119,6 +166,97 @@ export const LessonsPage: React.FC<LessonsPageProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Lesson Search Bar with Clear Button */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              commitLessonSearch(lessonSearch);
+            }}
+            className="flex items-center gap-2"
+          >
+            <div className="flex-1 relative flex items-center">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+              <input
+                type="text"
+                value={lessonSearch}
+                onChange={(e) => setLessonSearch(e.target.value)}
+                placeholder={lang === 'uz' ? "Darslarni qidirish (mavzu, soha)..." : "Search lessons by title or topic..."}
+                className="w-full pl-9 pr-12 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-1 focus:ring-blue-500 shadow-2xs"
+              />
+              {lessonSearch && (
+                <button
+                  type="button"
+                  onClick={() => setLessonSearch('')}
+                  className="absolute right-3 p-1 rounded-full text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title={t.clearSearchInput}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-colors shrink-0"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>{lang === 'uz' ? "Qidirish" : "Search"}</span>
+            </button>
+          </form>
+
+          {/* Lesson Search History Row with Delete Buttons */}
+          <div className="p-3 rounded-xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300 text-xs">
+                <Search className="w-3.5 h-3.5 text-blue-500" />
+                <span>{lang === 'uz' ? "Darslar Qidiruv Tarixi" : "Lesson Search History"}</span>
+                <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-950 px-1.5 py-0.5 rounded-full">
+                  {lessonSearchHistory.length}
+                </span>
+              </span>
+
+              {lessonSearchHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllLessonHistory}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-400 hover:underline transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>{lang === 'uz' ? "Tarixni tozalash" : "Clear History"}</span>
+                </button>
+              )}
+            </div>
+
+            {lessonSearchHistory.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                {lessonSearchHistory.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs hover:border-blue-400"
+                  >
+                    <span
+                      onClick={() => commitLessonSearch(item)}
+                      className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    >
+                      {item}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => removeLessonHistoryItem(e, item)}
+                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-red-500 transition-colors"
+                      title={lang === 'uz' ? "O'chirish" : "Delete"}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-xs">
+                {lang === 'uz' ? "Darslar qidiruv tarixi bo'sh." : "Lesson search history is empty."}
+              </p>
+            )}
           </div>
 
           {/* Lessons Grid */}

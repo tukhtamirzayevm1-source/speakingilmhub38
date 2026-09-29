@@ -15,6 +15,7 @@ import {
   Languages,
   Sparkles,
   Headphones,
+  History,
 } from 'lucide-react';
 import { CEFRLevel, Language } from '../types';
 import { translations } from '../i18n/translations';
@@ -28,6 +29,7 @@ interface NavbarProps {
   onToggleTheme: () => void;
   currentLevel: CEFRLevel;
   onOpenLevelTest: () => void;
+  onOpenHistory?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -39,6 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   currentLevel,
   onOpenLevelTest,
+  onOpenHistory,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const t = translations[lang];
@@ -113,6 +116,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Tools */}
           <div className="flex items-center gap-2">
+            {/* History Button */}
+            {onOpenHistory && (
+              <button
+                onClick={onOpenHistory}
+                title={t.conversationHistory}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+              >
+                <History className="w-3.5 h-3.5 text-blue-500" />
+                <span className="hidden sm:inline">{t.history}</span>
+              </button>
+            )}
+
             {/* Level Badge & Test Trigger */}
             <button
               onClick={onOpenLevelTest}
@@ -175,6 +190,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               );
             })}
+
+            {onOpenHistory && (
+              <button
+                onClick={() => {
+                  onOpenHistory();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all border border-blue-200 dark:border-blue-900/40"
+              >
+                <History className="w-4 h-4 shrink-0 text-blue-500" />
+                <span className="truncate font-semibold">{t.history}</span>
+              </button>
+            )}
           </div>
         </div>
       )}

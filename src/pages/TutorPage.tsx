@@ -23,9 +23,26 @@ export const TutorPage: React.FC<TutorPageProps> = ({
 }) => {
   const [mode, setMode] = useState<SpeakingMode>(initialMode);
   const [level, setLevel] = useState<CEFRLevel>(initialLevel);
+  const [activeSessionId, setActiveSessionId] = useState<string>(`tutor-session-${initialMode}-${initialLevel}`);
   const t = translations[lang];
 
   const levels: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+  const handleModeChange = (newMode: SpeakingMode) => {
+    setMode(newMode);
+    setActiveSessionId(`tutor-session-${newMode}-${level}`);
+  };
+
+  const handleLevelChange = (newLevel: CEFRLevel) => {
+    setLevel(newLevel);
+    setActiveSessionId(`tutor-session-${mode}-${newLevel}`);
+  };
+
+  const handleSelectSession = (selectedId: string, selectedMode: SpeakingMode, selectedLevel: CEFRLevel) => {
+    setActiveSessionId(selectedId);
+    if (selectedMode) setMode(selectedMode);
+    if (selectedLevel) setLevel(selectedLevel);
+  };
 
   const modeOptions: { id: SpeakingMode; label: string }[] = [
     { id: 'free_conversation', label: t.mode_free_conversation },
@@ -56,7 +73,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({
           </span>
           <select
             value={mode}
-            onChange={(e) => setMode(e.target.value as SpeakingMode)}
+            onChange={(e) => handleModeChange(e.target.value as SpeakingMode)}
             className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-blue-500"
           >
             {modeOptions.map((opt) => (
@@ -76,7 +93,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({
             {levels.map((lvl) => (
               <button
                 key={lvl}
-                onClick={() => setLevel(lvl)}
+                onClick={() => handleLevelChange(lvl)}
                 className={`px-2 py-1 rounded text-xs font-bold transition-all ${
                   level === lvl
                     ? 'bg-blue-600 text-white shadow-xs'
@@ -103,12 +120,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({
 
       {/* Embedded Core VoiceChat */}
       <VoiceChat
-        key={`${mode}-${level}`}
+        key={activeSessionId}
         mode={mode}
         userLevel={level}
         explanationLanguage={explanationLanguage}
-        sessionId={`tutor-session-${mode}-${level}`}
+        sessionId={activeSessionId}
         onUpdateStats={onUpdateStats}
+        onSelectSession={handleSelectSession}
       />
     </div>
   );

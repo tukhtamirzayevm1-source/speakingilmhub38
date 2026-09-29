@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { LevelTestModal } from './components/LevelTestModal';
+import { ConversationHistoryModal } from './components/ConversationHistoryModal';
 import { HomePage } from './pages/HomePage';
 import { TutorPage } from './pages/TutorPage';
 import { ModesPage } from './pages/ModesPage';
@@ -19,6 +20,7 @@ export default function App() {
   const [settings, setSettings] = useState<UserSettings>(dataStore.getSettings());
   const [stats, setStats] = useState<UserStats>(dataStore.getStats());
   const [isLevelTestOpen, setIsLevelTestOpen] = useState<boolean>(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
   const [activeSpeakingMode, setActiveSpeakingMode] = useState<SpeakingMode>('free_conversation');
 
   // Apply dark mode class to html element
@@ -88,6 +90,7 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         currentLevel={stats.currentLevel}
         onOpenLevelTest={() => setIsLevelTestOpen(true)}
+        onOpenHistory={() => setIsHistoryModalOpen(true)}
       />
 
       {/* Main View Area */}
@@ -189,6 +192,18 @@ export default function App() {
         onClose={() => setIsLevelTestOpen(false)}
         lang={settings.interfaceLanguage}
         onApplyLevel={handleApplyLevel}
+      />
+
+      {/* Conversation History Modal */}
+      <ConversationHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        lang={settings.interfaceLanguage}
+        onSelectSession={(sessionId, selectedMode) => {
+          if (selectedMode) setActiveSpeakingMode(selectedMode);
+          setCurrentTab('tutor');
+          setIsHistoryModalOpen(false);
+        }}
       />
 
       {/* Footer */}

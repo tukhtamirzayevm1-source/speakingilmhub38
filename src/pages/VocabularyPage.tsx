@@ -9,6 +9,9 @@ import {
   Plus,
   Layers,
   ArrowRight,
+  History,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { Language, VocabularyWord } from '../types';
 import { translations } from '../i18n/translations';
@@ -25,6 +28,7 @@ interface VocabularyPageProps {
 export const VocabularyPage: React.FC<VocabularyPageProps> = ({ lang, onUpdateStats }) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchHistory, setSearchHistory] = useState<string[]>(dataStore.getSearchHistory());
   const [learnedWords, setLearnedWords] = useState<VocabularyWord[]>(dataStore.getLearnedWords());
   const [aiLookupQuery, setAiLookupQuery] = useState<string>('');
   const [aiResult, setAiResult] = useState<any | null>(null);
@@ -76,10 +80,39 @@ export const VocabularyPage: React.FC<VocabularyPageProps> = ({ lang, onUpdateSt
     onUpdateStats?.();
   };
 
+  const handleCommitSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (trimmed) {
+      const updated = dataStore.addSearchHistory(trimmed);
+      setSearchHistory(updated);
+    }
+  };
+
+  const handleClearSearchQuery = () => {
+    setSearchQuery('');
+  };
+
+  const handleSelectHistoryItem = (term: string) => {
+    setSearchQuery(term);
+    handleCommitSearch(term);
+  };
+
+  const handleRemoveHistoryItem = (e: React.MouseEvent, term: string) => {
+    e.stopPropagation();
+    const updated = dataStore.removeSearchHistoryItem(term);
+    setSearchHistory(updated);
+  };
+
+  const handleClearAllHistory = () => {
+    dataStore.clearSearchHistory();
+    setSearchHistory([]);
+  };
+
   const handleAiLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiLookupQuery.trim()) return;
 
+    handleCommitSearch(aiLookupQuery.trim());
     setIsLoadingAi(true);
     setAiResult(null);
 
@@ -159,13 +192,25 @@ export const VocabularyPage: React.FC<VocabularyPageProps> = ({ lang, onUpdateSt
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={aiLookupQuery}
-              onChange={(e) => setAiLookupQuery(e.target.value)}
-              placeholder="e.g. Serendipity, Cutting-edge, Look into, In the long run..."
-              className="flex-1 px-4 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={aiLookupQuery}
+                onChange={(e) => setAiLookupQuery(e.target.value)}
+                placeholder="e.g. Serendipity, Cutting-edge, Look into, In the long run..."
+                className="w-full pl-4 pr-9 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              />
+              {aiLookupQuery && (
+                <button
+                  type="button"
+                  onClick={() => setAiLookupQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  title="Clear input"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
             <button
               type="submit"
               disabled={isLoadingAi || !aiLookupQuery.trim()}
@@ -225,15 +270,118 @@ export const VocabularyPage: React.FC<VocabularyPageProps> = ({ lang, onUpdateSt
 
       {/* Category Pills & Search */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2 relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-          />
+        {/* Search Input Bar with Clear Button & Submit */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCommitSearch(searchQuery);
+          }}
+          className="flex items-center gap-2"
+        >
+          <div className="flex-1 relative flex items-center">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="w-full pl-9 pr-12 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={handleClearSearchQuery}
+                className="absolute right-2.5 p-1 rounded-lg text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
+                title={t.clearSearchInput}
+              >
+                <X className="w-3.5 h-3.5" />
+                <span className="text-[10px] hidden sm:inline text-slate-400 hover:text-red-500">
+                  {lang === 'uz' ? "Tozalash" : "Clear"}
+                </span>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition-colors shrink-0"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>{lang === 'uz' ? "Qidirish" : "Search"}</span>
+          </button>
+        </form>
+
+        {/* Permanent Search History Panel ("Qidiruv Tarixi") */}
+        <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-2.5 text-xs shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <History className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                {lang === 'uz' ? "Qidiruv Tarixi" : "Search History"}
+              </span>
+              <span className="px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px] font-semibold">
+                {searchHistory.length}
+              </span>
+            </div>
+
+            {/* Clear Entire Search History Button */}
+            {searchHistory.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllHistory}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 border border-red-200 dark:border-red-900/40 transition-colors"
+                title={t.clearSearchHistory}
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>{lang === 'uz' ? "Tarixni tozalash" : "Clear History"}</span>
+              </button>
+            )}
+          </div>
+
+          {/* History Item Pills with Delete Buttons */}
+          {searchHistory.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {searchHistory.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="group inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs text-xs transition-all hover:border-blue-400 dark:hover:border-blue-500"
+                >
+                  <span
+                    onClick={() => handleSelectHistoryItem(item)}
+                    className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 font-medium"
+                    title={lang === 'uz' ? `"${item}" bo'yicha qidirish` : `Search "${item}"`}
+                  >
+                    {item}
+                  </span>
+                  {/* Delete individual search item button */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemoveHistoryItem(e, item)}
+                    className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 transition-colors"
+                    title={lang === 'uz' ? `"${item}"ni tarixdan o'chirish` : `Remove "${item}" from history`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 text-slate-500 dark:text-slate-400 text-xs py-1">
+              <span>{lang === 'uz' ? "Qidiruv tarixi bo'sh. Tezkor tavsiyalar:" : "Search history is empty. Quick suggestions:"}</span>
+              {['Accomplish', 'Phrasal verbs', 'Serendipity', 'Idioms', 'Daily'].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleSelectHistoryItem(s)}
+                  className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 text-[11px] font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                >
+                  + {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Categories Bar */}

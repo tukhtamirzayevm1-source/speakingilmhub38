@@ -44,6 +44,17 @@ export interface ChatMessage {
   durationSeconds?: number;
 }
 
+export interface ConversationSession {
+  id: string;
+  title: string;
+  mode: SpeakingMode;
+  userLevel: CEFRLevel;
+  lastMessage: string;
+  messageCount: number;
+  updatedAt: number;
+  createdAt: number;
+}
+
 export interface VocabularyWord {
   id: string;
   word: string;

@@ -26,6 +26,23 @@ const ai = new GoogleGenAI({
 // Helper to check API key
 const hasApiKey = () => !!process.env.GEMINI_API_KEY;
 
+async function generateContentWithFallback(params: any) {
+  const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+  let lastErr: any;
+  for (const model of candidateModels) {
+    try {
+      return await ai.models.generateContent({
+        ...params,
+        model,
+      });
+    } catch (err: any) {
+      lastErr = err;
+      console.warn(`Model ${model} failed: ${err?.message || err}. Attempting fallback.`);
+    }
+  }
+  throw lastErr;
+}
+
 function buildGracefulResponse(userText: string, userLevel: string = 'B1', explanationLanguage: string = 'uz') {
   const lower = userText.toLowerCase();
   const isUzbekInput = /[\b\s](men|sen|biz|salom|bugun|qanday|yaxshi|kerak|bilan|uchun|nima|ha|yo'q|rahmat|qayerda|gapir|til|ish|dars)[\b\s]|^salom|^men|^bugun/i.test(lower);
@@ -151,8 +168,7 @@ ${lessonContext ? `Lesson/Topic Context: ${lessonContext}` : ''}
       ],
     });
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+    const response = await generateContentWithFallback({
       contents: conversationHistory as any,
       config: {
         systemInstruction,
@@ -397,8 +413,7 @@ app.post('/api/vocabulary/lookup', async (req: Request, res: Response) => {
     const prompt = `Provide an in-depth linguistic entry for the English word or idiom: "${query}".
 Translate the meaning and example into Uzbek (O'zbek tili). Provide accurate IPA phonetics, part of speech, CEFR level, synonyms, and collocations.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+    const response = await generateContentWithFallback({
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
